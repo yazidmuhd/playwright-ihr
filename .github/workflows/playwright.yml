@@ -46,7 +46,8 @@ jobs:
           node-version: lts/*
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      # The login setup step always runs in Chromium, so every job needs it as well
+      - run: npx playwright install --with-deps chromium ${{ matrix.browser }}
       - name: Run tests
         run: npx playwright test --project=${{ matrix.project }} --reporter=blob,github
         env:
