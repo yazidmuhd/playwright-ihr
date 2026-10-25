@@ -1,10 +1,10 @@
 # Playwright end-to-end tests for Sauce Demo
 
-[![Playwright tests](https://github.com/yazidmuhd/playwright-saucedemo/actions/workflows/playwright.yml/badge.svg)](https://github.com/yazidmuhd/playwright-saucedemo/actions/workflows/playwright.yml)
+[![Playwright tests](https://github.com/yazidmuhd/playwright-ihr/actions/workflows/playwright.yml/badge.svg)](https://github.com/yazidmuhd/playwright-ihr/actions/workflows/playwright.yml)
 
 An automated test suite for [saucedemo.com](https://www.saucedemo.com), a public demo online shop, built with **Playwright** and **TypeScript**. It tests what a real customer does: signing in, browsing and sorting products, filling a cart and checking out. It runs on Chromium, Firefox, WebKit (Safari) and a mobile viewport.
 
-**[View the latest test report →](https://yazidmuhd.github.io/playwright-saucedemo/)**, published automatically after every run on `main`.
+**[View the latest test report →](https://yazidmuhd.github.io/playwright-ihr/)**, published automatically after every run on `main`.
 
 ## Highlights
 
