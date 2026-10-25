@@ -1,0 +1,21 @@
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import playwright from 'eslint-plugin-playwright';
+
+export default tseslint.config(
+  { ignores: ['node_modules', 'playwright-report', 'test-results', 'blob-report', '.auth'] },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    files: ['tests/**/*.ts'],
+    ...playwright.configs['flat/recommended'],
+    rules: {
+      ...playwright.configs['flat/recommended'].rules,
+      // Page objects carry their own assertions, e.g. cartPage.expectProducts(...)
+      'playwright/expect-expect': [
+        'error',
+        { assertFunctionPatterns: ['^expect[A-Z]', '\\.expect[A-Z]\\w*$'] },
+      ],
+    },
+  },
+);
