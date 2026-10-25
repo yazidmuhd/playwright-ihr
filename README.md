@@ -1,103 +1,137 @@
-# Playwright end-to-end tests for Sauce Demo
+# Playwright end-to-end tests for i-HR
 
 [![Playwright tests](https://github.com/yazidmuhd/playwright-ihr/actions/workflows/playwright.yml/badge.svg)](https://github.com/yazidmuhd/playwright-ihr/actions/workflows/playwright.yml)
 
-An automated test suite for [saucedemo.com](https://www.saucedemo.com), a public demo online shop, built with **Playwright** and **TypeScript**. It tests what a real customer does: signing in, browsing and sorting products, filling a cart and checking out. It runs on Chromium, Firefox, WebKit (Safari) and a mobile viewport.
+An automated test suite, built with **Playwright** and **TypeScript**, for [**i-HR**](https://github.com/yazidmuhd/ihr): an AI-assisted recruitment system (Laravel, Vue, PostgreSQL) that I built as my final year project. The tests drive the real application in real browsers (Chromium, Firefox, WebKit/Safari and a mobile viewport), the way HR staff and job applicants use it.
 
 **[View the latest test report →](https://yazidmuhd.github.io/playwright-ihr/)**, published automatically after every run on `main`.
 
-## Highlights
+## What it tests
 
-- **Page Object Model.** Each screen is a class (`LoginPage`, `InventoryPage`, `CartPage`, …), so tests read like user steps and selectors live in one place.
-- **Custom fixtures.** Tests receive ready-made page objects (`async ({ cartPage }) => …`) instead of constructing them.
-- **Log in once, reuse the session.** A setup project signs in through the UI and saves the session; other tests start signed in. They stay fast and independent of each other.
-- **Data-driven tests.** Login errors, sort orders and checkout form validation are each one test template looping over a table of cases.
-- **Business-rule checks.** The checkout test recalculates subtotal, 8% tax and total from the catalogue data, rather than only checking that some numbers appear.
-- **Known defects tracked, not ignored.** Sauce Demo has accounts with deliberate bugs. Each bug has a test asserting the _correct_ behaviour, marked `test.fail()` with a description. The suite stays green while the bug exists and turns red when it's fixed. See [Defects found](#defects-found).
-- **Accessibility.** [axe-core](https://github.com/dequelabs/axe-core) scans key pages against WCAG 2.1 A/AA. The run fails on serious or critical issues, and every finding is attached to the report.
-- **CI/CD.**
-  - GitHub Actions runs each browser in parallel.
-  - The results are merged into one HTML report and published to GitHub Pages.
-  - It also runs daily, to catch changes on the live site.
-  - Lint and type checks run on every push.
-- **Debuggable failures.** Screenshots, videos and Playwright traces are recorded for failed tests.
+The main test follows one hire from start to finish, with **HR and two applicants in separate browsers at the same time**:
 
-## Test coverage
+```
+HR posts a vacancy ─▶ two applicants register, upload résumés, apply
+                   ─▶ the AI ranks the better match first (higher score, matching skills)
+                   ─▶ HR shortlists and invites ─▶ the candidate confirms the interview
+                   ─▶ HR marks it done, two panels rate it 5★ and 4★ ─▶ final score = 60% résumé + 40% interview
+                   ─▶ HR converts the candidate to an employee ─▶ the hiring timeline shows who did what
+```
 
-| Area              | File                                                   | Tests | What is checked                                                                                                                                            |
-| ----------------- | ------------------------------------------------------ | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Login and session | [`auth.spec.ts`](tests/auth.spec.ts)                   |    10 | Valid login, locked-out user, wrong/unknown/empty credentials, dismissing errors, masked password, access blocked when signed out, logout ends the session |
-| Product list      | [`inventory.spec.ts`](tests/inventory.spec.ts)         |     7 | Full catalogue with prices, unique images, four sort orders, product detail page                                                                           |
-| Cart              | [`cart.spec.ts`](tests/cart.spec.ts)                   |     6 | Badge and button states, order of items, cart kept across pages and reloads, removing items, reset app state                                               |
-| Checkout          | [`checkout.spec.ts`](tests/checkout.spec.ts)           |     6 | Full purchase with totals and tax, required fields, cancel from each step keeps the cart                                                                   |
-| Known defects     | [`known-issues.spec.ts`](tests/known-issues.spec.ts)   |     6 | Bugs in `problem_user` and `error_user`, tracked as expected failures                                                                                      |
-| Accessibility     | [`accessibility.spec.ts`](tests/accessibility.spec.ts) |     3 | WCAG 2.1 A/AA scan of login, product list and cart                                                                                                         |
+| Area                     | File                                                       | Tests | What is checked                                                                                                                                                                                                |
+| ------------------------ | ---------------------------------------------------------- | ----: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign in and registration | [`auth.spec.ts`](tests/auth.spec.ts)                       |    12 | HR and applicant sign-in, wrong password, password policy (data-driven), duplicate e-mail, mismatched passwords, applicants blocked from HR (403), logout ends the session                                     |
+| Job board                | [`job-board.spec.ts`](tests/job-board.spec.ts)             |     5 | Browsing while signed out, vacancy details, search, sign-in required to apply, new vacancies appear immediately                                                                                                |
+| Applicant                | [`applicant.spec.ts`](tests/applicant.spec.ts)             |     5 | Résumé upload and AI summary, applying, match score shown, no duplicate applications, withdrawing                                                                                                              |
+| Hiring pipeline          | [`hiring-pipeline.spec.ts`](tests/hiring-pipeline.spec.ts) |     1 | The whole journey above, in 9 named steps                                                                                                                                                                      |
+| Security                 | [`security.spec.ts`](tests/security.spec.ts)               |     7 | HR console refused outside the office network, applicants still served; security headers; CSRF protection; résumé file-type checks in the browser _and_ on the server; stored XSS through the applicant's name |
+| Accessibility            | [`accessibility.spec.ts`](tests/accessibility.spec.ts)     |     7 | axe-core WCAG 2.1 A/AA scans of 7 pages, failing on any _new_ serious issue                                                                                                                                    |
+| Known defects            | [`known-issues.spec.ts`](tests/known-issues.spec.ts)       |     4 | Bugs the suite found, tracked as expected failures (below)                                                                                                                                                     |
 
-That's 38 tests per desktop browser, plus the `@smoke` tests on a mobile viewport: **120 test runs** in total.
+There are 34 tests on each desktop browser, plus 7 accessibility scans in Chromium and the `@smoke` tests on a mobile viewport: **114 test runs** in total.
 
-## Defects found
+## Defects found in i-HR
 
-These bugs are deliberate in Sauce Demo, and the suite documents them.
+Writing these tests uncovered real bugs. Each has a test that asserts the _correct_ behaviour, marked `test.fail()` with a description. The suite stays green while the bug exists and turns red the day it's fixed.
 
-| User           | Defect                                                          | Test                                      |
-| -------------- | --------------------------------------------------------------- | ----------------------------------------- |
-| `problem_user` | All products show the same image                                | `every product has its own image`         |
-| `problem_user` | "Name (Z to A)" sort does nothing                               | `sorting Z to A reorders the list`        |
-| `problem_user` | "Add to cart" does nothing for some products                    | `every product can be added to the cart`  |
-| `problem_user` | Typing a last name overwrites the first name, blocking checkout | `the last name field keeps what is typed` |
-| `error_user`   | Sorting shows an alert "Sorting is broken!"                     | `sorting works without an error popup`    |
-| `error_user`   | The Finish button never places the order                        | `a purchase can be completed`             |
+| Defect                                                                                       | Impact                                                     | Test                                                              |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------- |
+| The "Schedule Interview" pop-up is taller than a 1366×768 laptop screen and can't scroll     | HR on a common laptop **can't send interview invitations** | `the interview invitation can be sent from a laptop-sized screen` |
+| The employee list shows "-" for Employee No and Department; the query never selects them     | Hired staff appear without their number or department      | `the employee list shows the employee number and department`      |
+| The public job board shows the applicant menu and a **Logout** button to signed-out visitors | Confusing navigation for first-time visitors               | `signed-out visitors are not offered a Logout button`             |
+| Pop-ups have no `role="dialog"`                                                              | Screen readers don't announce them                         | `confirmation pop-ups are announced as dialogs`                   |
 
-The accessibility scan also reports two **moderate** findings, which don't fail the build: the pages have no main heading (`page-has-heading-one`), and some content sits outside a landmark region (`region`).
+Accessibility scans also report these **serious or critical** issues. They're recorded as the known baseline, so only _new_ issues fail the build:
+
+- The show-password buttons on the login and registration pages have no label (`button-name`).
+- The filter drop-downs on the job board and the vacancy list have no label (`select-name`).
+- The HR dashboard has no page title (`document-title`).
+- Low text contrast on badges and hints appears across the site (`color-contrast`).
+
+Outside the scans: the star-rating buttons on the evaluation page are announced only as "★", so a screen-reader user can't tell which rating each one gives.
+
+## How it works
+
+```
+Playwright ──▶ e2e-server/start.mjs
+                 ├─ mock AI service (stands in for OpenRouter)          :4010
+                 ├─ PostgreSQL test database, reset and seeded each run
+                 └─ i-HR on PHP's built-in server, configured for tests  :8090
+```
+
+- **The real application, untouched.** Playwright's `webServer` starts i-HR from its own repository. Test settings come only from environment variables: a fresh database, the mock AI, and a known HR account.
+- **AI without the AI bill.** i-HR sends résumé text to an AI model. In tests, a [small mock server](e2e-server/mock-ai.mjs) answers in the same format as OpenRouter, building its reply from labelled lines in the [test résumés](fixtures/). Results are fast, free, offline and predictable.
+
+## Design decisions
+
+- **Users as fixtures.** Tests receive `hr` (a signed-in HR browser with its page objects) and `newApplicant()` (registers a brand-new applicant through the sign-up form, in a browser of their own). Multi-user stories read naturally:
+  ```ts
+  const strong = await newApplicant({ resume: RESUMES.strongMatch });
+  await applyFor(strong, vacancy.title);
+  await hr.vacancies.openRanking(vacancy.title);
+  ```
+- **Page Object Model.** Each screen is a class ([`src/pages`](src/pages)), so selectors live in one place. i-HR has no test ids, so elements are found the way users find them: by role, label and visible text.
+- **Every browser has its own IP address.** i-HR limits sign-ups to 10 per hour per IP and only lets the "office network" reach HR pages. Each browser context sends its own `X-Real-IP` (an address in 127.0.0.0/8), so parallel tests don't share rate limits. A single test can still pretend to be outside the network.
+- **Parallel-safe data.** Every test creates its own vacancies and applicants with unique names and e-mails, so tests can run in any order, three at a time.
+- **No shared session for destructive tests.** HR tests reuse a saved session for speed. The logout test signs in separately, because logging out the shared session would sign out every HR test running alongside it. A flaky run showed this ("419 Page Expired") until it was fixed.
+- **Waiting for background saves.** Some i-HR screens update instantly and save in the background (e.g. star ratings), then reload the page's data. [`untilSaved()`](src/support/saves.ts) waits for that whole round trip before the next action. Clicking on too early either cancelled the save or let the reload close a dialog that had just opened.
+- **Lasting results over passing messages.** Tests assert outcomes that stay on screen, such as status "scored" or a "Re-apply" button, not success messages that fade.
+- **Accessibility as a ratchet.** Known axe findings form a baseline, and a test fails only on new serious issues. As i-HR fixes an issue, it's removed from the list, so the bar only rises.
+
+## Running locally
+
+You need Node.js 20+, PHP 8.2+ with Composer, and PostgreSQL.
+
+```bash
+# 1. The application under test, next to this repository
+git clone https://github.com/yazidmuhd/ihr ../ihr
+cd ../ihr && composer install && npm ci && npm run build && cp .env.example .env && php artisan key:generate && cd -
+createdb ihr_e2e
+
+# 2. The tests
+npm ci
+npx playwright install
+cp .env.example .env            # set IHR_APP_DIR if i-HR is somewhere else
+
+npm test                        # everything; starts i-HR automatically
+npm run test:chromium           # one browser
+npm run test:smoke              # quick @smoke subset
+npm run test:ui                 # Playwright's interactive UI mode
+npm run report                  # open the last HTML report
+```
+
+`npm run ihr:start` starts i-HR, the test database and the mock AI on their own, for exploring at http://127.0.0.1:8090. The test HR account is `humanres` / `E2e-Hr-Password-2026`.
+
+## Continuous integration
+
+[GitHub Actions](.github/workflows/playwright.yml):
+
+1. Checks out this repository and **i-HR's latest `main`**. Any branch, tag or commit can also be chosen when starting a run by hand.
+2. Starts PostgreSQL, installs PHP and builds i-HR.
+3. Runs lint, type checks and formatting checks.
+4. Runs each browser in a parallel job.
+5. Merges the results into one HTML report and publishes it to GitHub Pages.
+
+It also runs daily, so a change in i-HR that breaks a user journey shows up the next morning.
 
 ## Project structure
 
 ```
+e2e-server/       starts i-HR, the test database and the mock AI service
+fixtures/         test résumés (PDF) for a strong and a weak match
 src/
-  pages/          one class per screen: LoginPage, InventoryPage, ProductPage, CartPage, CheckoutPages
-  components/     Header (cart badge, menu, logout), shared by every signed-in page
-  data/           users, product catalogue (names, prices) and the test customer
-  utils/          price parsing and rounding
-  fixtures.ts     extends Playwright's `test` with the page objects
-tests/
-  auth.setup.ts   signs in once and saves the session for the other tests
-  *.spec.ts       the tests
-playwright.config.ts   browsers, retries, tracing, reporters
-.github/workflows/     CI: lint, test matrix, merged report, GitHub Pages
+  pages/          page objects: auth, applicant screens, HR screens
+  support/        dialogs, background saves, network (IP) helpers
+  data/           accounts and test-data builders
+  fixtures.ts     `hr`, `newApplicant()` and page-object fixtures
+  flows.ts        shared multi-step journeys (apply, shortlist, …)
+tests/            the specs
 ```
-
-## Running locally
-
-Requires Node.js 20 or newer.
-
-```bash
-npm ci
-npx playwright install          # downloads Chromium, Firefox and WebKit
-
-npm test                        # everything, all browsers
-npm run test:chromium           # one browser
-npm run test:smoke              # only the @smoke tests
-npm run test:headed             # watch it run in a real browser window
-npm run test:ui                 # Playwright's interactive UI mode
-npm run report                  # open the last HTML report
-
-npm run lint && npm run typecheck && npm run format:check
-```
-
-Sauce Demo's demo accounts and password are printed on its login page, so no setup is needed. `BASE_URL` and `SAUCE_PASSWORD` can be overridden (see `.env.example`).
-
-## Design decisions
-
-- **`data-test` selectors.** The site marks elements with `data-test` attributes, and `testIdAttribute: 'data-test'` makes `getByTestId()` use them. They don't change when styling or wording does. Role-based locators are used where they read better (e.g. the menu button).
-- **Web-first assertions only.** No fixed waits (`waitForTimeout`). Every check uses Playwright's auto-retrying `expect`, so tests wait exactly as long as the page needs.
-- **Independent tests.** Every test opens a fresh browser context, so tests can run in parallel and in any order. The Chromium suite was run three times in a row with no flaky results.
-- **Expected values come from data, not from the page.** Sort orders and totals are compared with the catalogue in `src/data/products.ts`. A test that only re-sorts what the page shows would pass even if prices were wrong.
-- **Lint rules for tests.** `eslint-plugin-playwright` catches common mistakes, such as a test without assertions or a missing `await`.
 
 ## Tech stack
 
-Playwright · TypeScript · axe-core · ESLint (typescript-eslint, eslint-plugin-playwright) · Prettier · GitHub Actions · GitHub Pages
+Playwright · TypeScript · axe-core · Node.js (mock AI service) · PHP/Laravel and PostgreSQL (application under test) · ESLint · Prettier · GitHub Actions · GitHub Pages
 
 ---
 
-Built by [Muhammad Yazid](https://github.com/yazidmuhd) as a test automation portfolio project. Sauce Demo is a public practice site by Sauce Labs; this project isn't affiliated with them.
+Built by [Muhammad Yazid](https://github.com/yazidmuhd). i-HR was developed as a final year project for CSP650 at Universiti Teknologi MARA.

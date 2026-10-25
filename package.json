@@ -1,8 +1,8 @@
 {
-  "name": "playwright-saucedemo",
+  "name": "playwright-ihr",
   "version": "1.0.0",
   "private": true,
-  "description": "End-to-end test suite for saucedemo.com with Playwright and TypeScript",
+  "description": "End-to-end test suite for i-HR, an AI-assisted recruitment system, with Playwright and TypeScript",
   "license": "MIT",
   "scripts": {
     "test": "playwright test",
@@ -14,7 +14,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "ihr:start": "node e2e-server/start.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
@@ -23,6 +24,7 @@
     "@types/node": "^26.6.5",
     "eslint": "^10.13.0",
     "eslint-plugin-playwright": "^2.12.1",
+    "globals": "^17.13.0",
     "prettier": "^3.9.10",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.0"

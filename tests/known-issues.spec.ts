@@ -1,95 +1,71 @@
-import { expect, SIGNED_OUT, test } from '../src/fixtures';
-import { ALL_PRODUCTS, CUSTOMER, PRODUCTS } from '../src/data/products';
-import { USERS, type Username } from '../src/data/users';
+import { expect, test } from '../src/fixtures';
+import { interviewSlot, RESUMES, vacancyData } from '../src/data/testData';
+import { confirmDialog } from '../src/support/dialogs';
+import { applyFor, shortlistTopCandidate, theShortlistedCandidate } from '../src/flows';
 
 /**
- * saucedemo ships accounts with deliberate bugs. Each test below asserts the CORRECT
- * behaviour and is marked test.fail() with the defect it documents, so:
- *   - the suite stays green while the bug exists (reported as "expected to fail"), and
- *   - it turns red the day the bug is fixed, prompting removal of the marker.
+ * Defects these tests found in i-HR. Each test asserts the CORRECT behaviour and is
+ * marked test.fail() with a description, so the suite stays green while the bug exists
+ * and turns red once it is fixed (then remove the marker). Details are in the README.
  */
-test.use({ storageState: SIGNED_OUT });
-
-const signInAs = (username: Username) =>
-  test.beforeEach(async ({ loginPage, inventoryPage }) => {
-    await loginPage.goto();
-    await loginPage.login(username);
-    await inventoryPage.expectLoaded();
-  });
-
 function knownDefect(description: string) {
   test.info().annotations.push({ type: 'known defect', description });
   test.fail();
 }
 
-test.describe('problem_user', () => {
-  signInAs(USERS.problem);
+test('the interview invitation can be sent from a laptop-sized screen', async ({ hr, newApplicant }) => {
+  test.slow(); // builds a shortlisted candidate first
+  knownDefect(
+    'The "Schedule Interview" pop-up is taller than a 1366×768 laptop window and cannot scroll, ' +
+      'so the "Send Invitation" button is unreachable',
+  );
+  const vacancy = vacancyData();
+  await hr.vacancyForm.create(vacancy);
+  const applicant = await newApplicant({ resume: RESUMES.strongMatch });
+  await applyFor(applicant, vacancy.title);
+  await shortlistTopCandidate(hr, vacancy.title);
+  const candidate = await theShortlistedCandidate(hr, vacancy.title);
 
-  test('every product has its own image', async ({ inventoryPage }) => {
-    knownDefect('All products show the same placeholder image');
-    const sources = await inventoryPage.itemImages.evaluateAll((imgs) =>
-      imgs.map((img) => (img as HTMLImageElement).src),
-    );
-    expect(new Set(sources).size).toBe(ALL_PRODUCTS.length);
-  });
+  await hr.page.setViewportSize({ width: 1366, height: 657 }); // 768 px screen minus browser bars
+  await hr.shortlist.openInviteForm(candidate);
 
-  test('sorting Z to A reorders the list', async ({ inventoryPage }) => {
-    knownDefect('Choosing "Name (Z to A)" leaves the list in its original order');
-    await inventoryPage.sortBy('za');
-    await expect(inventoryPage.itemNames.first()).toHaveText(PRODUCTS.redTShirt.name);
-  });
-
-  test('every product can be added to the cart', async ({ inventoryPage }) => {
-    knownDefect('"Add to cart" does nothing for some products (e.g. Bolt T-Shirt)');
-    await inventoryPage.add(PRODUCTS.backpack, PRODUCTS.boltTShirt);
-    await inventoryPage.header.expectCartCount(2);
-  });
-
-  test('the last name field keeps what is typed', async ({ inventoryPage, cartPage, checkoutInfoPage }) => {
-    knownDefect('Typing a last name overwrites the first name, so checkout cannot continue');
-    await inventoryPage.add(PRODUCTS.backpack);
-    await cartPage.goto();
-    await cartPage.checkout();
-
-    await checkoutInfoPage.enterDetails(CUSTOMER);
-
-    await expect(checkoutInfoPage.firstName).toHaveValue(CUSTOMER.firstName);
-    await expect(checkoutInfoPage.lastName).toHaveValue(CUSTOMER.lastName);
-  });
+  await expect(hr.page.getByRole('button', { name: 'Send Invitation' })).toBeInViewport({ timeout: 3_000 });
 });
 
-test.describe('error_user', () => {
-  signInAs(USERS.error);
+test('the employee list shows the employee number and department', async ({ hr, newApplicant }) => {
+  test.slow(); // builds a shortlisted candidate first
+  knownDefect('Employees list shows "-" for Employee No and Department: the query never selects them');
+  const vacancy = vacancyData();
+  await hr.vacancyForm.create(vacancy);
+  const applicant = await newApplicant({ resume: RESUMES.strongMatch });
+  await applyFor(applicant, vacancy.title);
+  await shortlistTopCandidate(hr, vacancy.title);
 
-  test('sorting works without an error popup', async ({ page, inventoryPage }) => {
-    knownDefect('Sorting opens an alert "Sorting is broken!" and the order does not change');
-    const dialogs: string[] = [];
-    page.on('dialog', async (dialog) => {
-      dialogs.push(dialog.message());
-      await dialog.dismiss();
-    });
+  // Invite, then hire straight from the shortlist
+  const candidate = await theShortlistedCandidate(hr, vacancy.title);
+  await hr.shortlist.invite(candidate, interviewSlot(), 'https://meet.google.com/abc-defg-hij');
+  await candidate.getByRole('button', { name: 'Hire' }).click();
+  await confirmDialog(hr.page, 'Hire Candidate?', 'Hire Now!');
+  await hr.employees.goto();
 
-    await inventoryPage.sortBy('za');
+  const row = hr.employees.row(applicant.email);
+  await expect(row.getByRole('cell').first()).toHaveText(/^EMP\d{8}-/, { timeout: 3_000 });
+  await expect(row).toContainText(vacancy.department, { timeout: 3_000 });
+});
 
-    expect(dialogs).toEqual([]);
-    await expect(inventoryPage.itemNames.first()).toHaveText(PRODUCTS.redTShirt.name);
-  });
+test('signed-out visitors are not offered a Logout button', async ({ page, jobBoard }) => {
+  knownDefect('The public job board shows the applicant menu and a Logout button to signed-out visitors');
+  await jobBoard.goto();
+  await expect(page.getByRole('button', { name: 'Logout' })).toBeHidden({ timeout: 3_000 });
+});
 
-  test('a purchase can be completed', async ({
-    inventoryPage,
-    cartPage,
-    checkoutInfoPage,
-    checkoutOverviewPage,
-    checkoutCompletePage,
-  }) => {
-    knownDefect('The Finish button does nothing, so the order is never placed');
-    await inventoryPage.add(PRODUCTS.backpack);
-    await cartPage.goto();
-    await cartPage.checkout();
-    await checkoutInfoPage.submit(CUSTOMER);
+test('confirmation pop-ups are announced as dialogs', async ({ newApplicant }) => {
+  knownDefect('Pop-ups have no role="dialog", so screen readers do not announce them');
+  const applicant = await newApplicant();
+  await applicant.jobBoard.goto();
+  await applicant.jobBoard.open('Backend Developer (Laravel)');
 
-    await checkoutOverviewPage.finishButton.click();
+  await applicant.job.applyButton.click();
 
-    await expect(checkoutCompletePage.header).toHaveText('Thank you for your order!', { timeout: 3_000 });
-  });
+  await expect(applicant.page.getByRole('dialog')).toBeVisible({ timeout: 3_000 });
 });

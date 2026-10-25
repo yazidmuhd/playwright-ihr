@@ -5,12 +5,20 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    - cron: '0 1 * * *' # daily, catches changes on the live demo site
+    - cron: '0 1 * * *' # daily, picks up the latest i-HR code
   workflow_dispatch:
+    inputs:
+      ihr_ref:
+        description: i-HR branch, tag or commit to test
+        default: main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  IHR_REPOSITORY: yazidmuhd/ihr
+  IHR_REF: ${{ inputs.ihr_ref || 'main' }}
 
 jobs:
   quality:
@@ -30,7 +38,7 @@ jobs:
   test:
     name: Test (${{ matrix.project }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -39,14 +47,60 @@ jobs:
           - { project: firefox, browser: firefox }
           - { project: webkit, browser: webkit }
           - { project: mobile-chrome, browser: chromium }
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ihr_e2e
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    env:
+      IHR_APP_DIR: ihr
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      IHR_DB_DATABASE: ihr_e2e
+
     steps:
       - uses: actions/checkout@v7
+
+      # The application under test
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ env.IHR_REPOSITORY }}
+          ref: ${{ env.IHR_REF }}
+          path: ihr
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_pgsql, gd, zip
+          coverage: none
       - uses: actions/setup-node@v7
         with:
           node-version: lts/*
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            ihr/package-lock.json
+      - name: Install and build i-HR
+        working-directory: ihr
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          npm ci
+          npm run build
+          cp .env.example .env
+          php artisan key:generate
+
+      # The tests
       - run: npm ci
-      # The login setup step always runs in Chromium, so every job needs it as well
+      # The HR sign-in setup step always runs in Chromium, so every job needs it as well
       - run: npx playwright install --with-deps chromium ${{ matrix.browser }}
       - name: Run tests
         run: npx playwright test --project=${{ matrix.project }} --reporter=blob,github
@@ -87,7 +141,7 @@ jobs:
         with:
           path: playwright-report
 
-  # Publishes the latest report from main at https://<user>.github.io/<repo>/
+  # Publishes the latest report from main at https://yazidmuhd.github.io/playwright-ihr/
   deploy-report:
     name: Publish report to GitHub Pages
     needs: report

@@ -1,52 +1,74 @@
 import { defineConfig, devices } from '@playwright/test';
-import { STORAGE_STATE } from './src/data/users';
+
+try {
+  process.loadEnvFile?.();
+} catch {
+  /* .env is optional (IHR_APP_DIR) */
+}
 
 const isCI = !!process.env.CI;
+const port = Number(process.env.IHR_PORT ?? 8090);
+
+// i-HR's dialogs need a reasonably tall window; see the "laptop screen" known issue
+const desktopViewport = { width: 1280, height: 1000 };
+
+// axe checks markup, which doesn't differ between browsers: run accessibility scans in Chromium only
+const chromiumOnly = /accessibility\.spec\.ts/;
 
 export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
-  workers: isCI ? 2 : undefined,
-  timeout: 30_000,
-  expect: { timeout: 5_000 },
+  workers: 3, // i-HR runs on PHP's built-in server: more parallel browsers just queue
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
 
   reporter: isCI
     ? [['list'], ['html', { open: 'never' }], ['github']]
     : [['list'], ['html', { open: 'never' }]],
 
+  // Resets the test database and starts i-HR plus the mock AI service (e2e-server/start.mjs)
+  webServer: {
+    command: 'node e2e-server/start.mjs',
+    url: `http://127.0.0.1:${port}/up`,
+    reuseExistingServer: !isCI,
+    timeout: 180_000,
+    stdout: 'pipe',
+  },
+
   use: {
-    baseURL: process.env.BASE_URL ?? 'https://www.saucedemo.com',
-    // saucedemo marks its elements with data-test="...", so getByTestId() reads that attribute
-    testIdAttribute: 'data-test',
+    baseURL: `http://127.0.0.1:${port}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: 'on-first-retry', // recording every test slows a loaded machine; retries are recorded
+    navigationTimeout: 20_000,
   },
 
   projects: [
-    // Logs in once and saves the session, so most tests start already signed in
-    { name: 'setup', testMatch: /auth\.setup\.ts/ },
+    // Signs the HR administrator in once and saves the session for HR tests
+    { name: 'setup', testMatch: /hr\.setup\.ts/ },
 
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'], storageState: STORAGE_STATE },
+      use: { ...devices['Desktop Chrome'], viewport: desktopViewport },
       dependencies: ['setup'],
     },
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'], storageState: STORAGE_STATE },
+      testIgnore: chromiumOnly,
+      use: { ...devices['Desktop Firefox'], viewport: desktopViewport },
       dependencies: ['setup'],
     },
     {
       name: 'webkit',
-      use: { ...devices['Desktop Safari'], storageState: STORAGE_STATE },
+      testIgnore: chromiumOnly,
+      use: { ...devices['Desktop Safari'], viewport: desktopViewport },
       dependencies: ['setup'],
     },
     {
       name: 'mobile-chrome',
-      use: { ...devices['Pixel 7'], storageState: STORAGE_STATE },
+      use: { ...devices['Pixel 7'] },
       dependencies: ['setup'],
       grep: /@smoke/,
     },
