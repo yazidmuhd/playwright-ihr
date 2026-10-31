@@ -12,9 +12,9 @@ mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 });
 
-async function openReport(query = '') {
+async function openReport(query = '', waitForText = 'hiring-pipeline.spec.ts') {
   await page.goto(REPORT + query);
-  await page.getByText('hiring-pipeline.spec.ts').first().waitFor();
+  await page.getByText(waitForText).first().waitFor();
 }
 
 async function openTest(title, project) {
@@ -42,11 +42,11 @@ await openTest('the interview invitation can be sent from a laptop-sized screen'
 await shot('03-known-defect');
 
 // 4. Cross-browser: the same tests in WebKit (Safari)
-await openReport('#?q=p:webkit');
+await openReport('#?q=p:webkit', 'auth.spec.ts');
 await shot('04-webkit-results');
 
 // 5. Security tests
-await openReport('#?q=security.spec.ts p:chromium');
+await openReport('#?q=security.spec.ts p:chromium', 'security.spec.ts');
 await shot('05-security-tests');
 
 // 6. The CI run that produced the report

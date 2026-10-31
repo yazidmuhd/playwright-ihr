@@ -30,6 +30,16 @@ HR posts a vacancy ─▶ two applicants register, upload résumés, apply
 
 There are 34 tests on each desktop browser, plus 7 accessibility scans in Chromium and the `@smoke` tests on a mobile viewport: **114 test runs** in total.
 
+## Proof of execution
+
+Screenshots of the [published report](https://yazidmuhd.github.io/playwright-ihr/) and the [GitHub Actions run](https://github.com/yazidmuhd/playwright-ihr/actions) that produced it. Both links are live; the report is regenerated on every push and every day. To refresh these images: `npm run screenshots`.
+
+|                                                                                                                     |                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **All tests passing across browsers**<br>![Report summary](docs/screenshots/01-report-summary.png)                  | **The hiring journey as named steps**<br>![Hiring pipeline steps](docs/screenshots/02-hiring-pipeline-steps.png) |
+| **A defect found in i-HR, tracked as an expected failure**<br>![Known defect](docs/screenshots/03-known-defect.png) | **The same tests in WebKit (Safari)**<br>![WebKit results](docs/screenshots/04-webkit-results.png)               |
+| **Security tests**<br>![Security tests](docs/screenshots/05-security-tests.png)                                     | **The CI pipeline that ran them**<br>![GitHub Actions run](docs/screenshots/06-github-actions-run.png)           |
+
 ## Defects found in i-HR
 
 Writing these tests uncovered real bugs. Each has a test that asserts the _correct_ behaviour, marked `test.fail()` with a description. The suite stays green while the bug exists and turns red the day it's fixed.
