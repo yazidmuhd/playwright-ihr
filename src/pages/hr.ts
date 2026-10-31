@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { VacancyData } from '../data/testData';
 import { confirmDialog } from '../support/dialogs';
 import { untilSaved } from '../support/saves';
@@ -43,19 +43,21 @@ export class VacancyFormPage {
   }
 
   async create(v: VacancyData): Promise<void> {
-    await this.goto();
-    await this.field('Job Title').fill(v.title);
-    await this.field('Department').selectOption(v.department);
-    await this.field('Work Arrangement').selectOption(v.workArrangement);
-    await this.field('Minimum Years').fill(String(v.minYears));
-    await this.field('Maximum Years').fill(String(v.maxYears));
-    await this.field('Education Requirement').fill(v.education);
-    await this.field('Core Skills').fill(v.skills.join(', '));
-    await this.page
-      .getByPlaceholder('Brief intro, key responsibilities, and requirements...')
-      .fill(v.description);
-    await this.page.getByRole('button', { name: 'Create Vacancy' }).click();
-    await expect(this.page).toHaveURL(/\/hr\/vacancies$/);
+    await test.step(`HR creates the vacancy ${v.title}`, async () => {
+      await this.goto();
+      await this.field('Job Title').fill(v.title);
+      await this.field('Department').selectOption(v.department);
+      await this.field('Work Arrangement').selectOption(v.workArrangement);
+      await this.field('Minimum Years').fill(String(v.minYears));
+      await this.field('Maximum Years').fill(String(v.maxYears));
+      await this.field('Education Requirement').fill(v.education);
+      await this.field('Core Skills').fill(v.skills.join(', '));
+      await this.page
+        .getByPlaceholder('Brief intro, key responsibilities, and requirements...')
+        .fill(v.description);
+      await this.page.getByRole('button', { name: 'Create Vacancy' }).click();
+      await expect(this.page).toHaveURL(/\/hr\/vacancies$/);
+    });
   }
 }
 

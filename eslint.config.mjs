@@ -7,8 +7,8 @@ export default tseslint.config(
   { ignores: ['node_modules', 'playwright-report', 'test-results', 'blob-report', '.auth'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
-  // The test server scripts run in Node
-  { files: ['e2e-server/**/*.mjs'], languageOptions: { globals: globals.node } },
+  // The test server and helper scripts run in Node
+  { files: ['e2e-server/**/*.mjs', 'scripts/**/*.mjs'], languageOptions: { globals: globals.node } },
   {
     files: ['tests/**/*.ts'],
     ...playwright.configs['flat/recommended'],

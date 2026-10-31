@@ -123,23 +123,28 @@ export const test = base.extend<Fixtures>({
     const contexts: BrowserContext[] = [];
 
     await use(async ({ name, resume } = {}) => {
-      const context = await newActorContext(browser, baseURL, testInfo);
-      contexts.push(context);
-      const page = await context.newPage();
       const data = applicantData(name);
+      const title = `register applicant ${data.name}` + (resume ? ' and upload a résumé' : '');
 
-      await registerAndSignIn(page, data);
-      const applicant: Applicant = {
-        ...data,
-        page,
-        jobBoard: new JobBoardPage(page),
-        job: new JobPage(page),
-        resume: new ResumePage(page),
-        applications: new MyApplicationsPage(page),
-        interviews: new MyInterviewsPage(page),
-      };
-      if (resume) await applicant.resume.upload(resume);
-      return applicant;
+      // One collapsible step in the report instead of every sign-up click
+      return base.step(title, async () => {
+        const context = await newActorContext(browser, baseURL, testInfo);
+        contexts.push(context);
+        const page = await context.newPage();
+
+        await registerAndSignIn(page, data);
+        const applicant: Applicant = {
+          ...data,
+          page,
+          jobBoard: new JobBoardPage(page),
+          job: new JobPage(page),
+          resume: new ResumePage(page),
+          applications: new MyApplicationsPage(page),
+          interviews: new MyInterviewsPage(page),
+        };
+        if (resume) await applicant.resume.upload(resume);
+        return applicant;
+      });
     });
 
     await Promise.all(contexts.map((c) => c.close()));

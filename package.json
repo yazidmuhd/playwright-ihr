@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "ihr:start": "node e2e-server/start.mjs"
+    "ihr:start": "node e2e-server/start.mjs",
+    "screenshots": "node scripts/report-screenshots.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

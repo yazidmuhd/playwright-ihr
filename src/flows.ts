@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import type { Applicant, Hr } from './fixtures';
 
 /**
@@ -7,16 +7,20 @@ import type { Applicant, Hr } from './fixtures';
  */
 
 export async function applyFor(applicant: Applicant, vacancyTitle: string): Promise<void> {
-  await applicant.jobBoard.goto();
-  await applicant.jobBoard.open(vacancyTitle);
-  await applicant.job.apply();
-  await expect(applicant.job.submittedButton).toBeDisabled();
+  await test.step(`${applicant.name} applies for ${vacancyTitle}`, async () => {
+    await applicant.jobBoard.goto();
+    await applicant.jobBoard.open(vacancyTitle);
+    await applicant.job.apply();
+    await expect(applicant.job.submittedButton).toBeDisabled();
+  });
 }
 
 /** HR shortlists the best-ranked candidate for a vacancy */
 export async function shortlistTopCandidate(hr: Hr, vacancyTitle: string): Promise<void> {
-  await hr.vacancies.openRanking(vacancyTitle);
-  await hr.ranking.shortlist(hr.ranking.candidates.first());
+  await test.step(`HR shortlists the top candidate for ${vacancyTitle}`, async () => {
+    await hr.vacancies.openRanking(vacancyTitle);
+    await hr.ranking.shortlist(hr.ranking.candidates.first());
+  });
 }
 
 /** Opens the vacancy's shortlist and returns its only shortlisted candidate */
